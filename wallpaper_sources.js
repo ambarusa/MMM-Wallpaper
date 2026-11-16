@@ -143,6 +143,90 @@ class BingSource extends WallpaperSource {
   }
 }
 
+class UnsplashSource extends WallpaperSource {
+  static matches(source) {
+    return source === "unsplash";
+  }
+
+  fetch() {
+    if (!this.config.unsplashAPIKey) {
+      console.error("MMM-Wallpaper: unsplashAPIKey is required when using the Unsplash source");
+      return;
+    }
+
+    const photoId = this.config.unsplashPhotoID;
+    const maximumEntries = Number(this.config.maximumEntries);
+    const count = Number.isFinite(maximumEntries) ? Math.min(30, Math.max(1, Math.floor(maximumEntries))) : 1;
+    const url = new URL(photoId
+      ? `https://api.unsplash.com/photos/${encodeURIComponent(photoId)}`
+      : "https://api.unsplash.com/photos/random");
+
+    if (!photoId) {
+      url.searchParams.set("count", count);
+      if (this.config.unsplashQuery) {
+        url.searchParams.set("query", this.config.unsplashQuery);
+      }
+
+      const collectionIDs = this.config.unsplashCollectionIDs;
+      const hasCollections = Array.isArray(collectionIDs) ? collectionIDs.length > 0 : Boolean(collectionIDs);
+
+      if (this.config.unsplashUserName) {
+        url.searchParams.set("username", this.config.unsplashUserName);
+      } else if (hasCollections) {
+        const collections = Array.isArray(collectionIDs) ? collectionIDs.join(",") : collectionIDs;
+        url.searchParams.set("collections", collections);
+      }
+
+      if (this.config.orientation) {
+        const orientation = {
+          vertical: "portrait",
+          horizontal: "landscape"
+        }[this.config.orientation] || this.config.orientation;
+        url.searchParams.set("orientation", orientation);
+      }
+    }
+
+    if (!this.module.allowUnsplashRequest(this.config.unsplashAPIKey)) {
+      return;
+    }
+
+    Promise.resolve().then(() => fetch(url, {
+      headers: {
+        "Accept-Version": "v1",
+        Authorization: `Client-ID ${this.config.unsplashAPIKey}`
+      }
+    })).then(response => {
+      const remaining = response.headers && response.headers.get("x-ratelimit-remaining");
+      if (remaining !== null && remaining !== undefined) {
+        this.module.observeUnsplashRateLimit(this.config.unsplashAPIKey, remaining);
+      }
+
+      if (!response.ok) {
+        throw new Error(`Unsplash API returned HTTP ${response.status}`);
+      }
+      return response.json();
+    }).then(data => {
+      const photos = Array.isArray(data) ? data : [data];
+      const images = photos.map(photo => {
+        if (!photo.urls || (!photo.urls.full && !photo.urls.regular) || !photo.user || !photo.user.name) {
+          throw new Error("Unsplash API returned incomplete photo data");
+        }
+
+        return {
+          url: photo.urls.full || photo.urls.regular,
+          caption: `Photo by ${photo.user.name} on Unsplash`
+        };
+      });
+
+      this.cacheResult(images.slice(0, count));
+    }).catch(error => {
+      console.error(`MMM-Wallpaper: failed to fetch Unsplash wallpaper: ${error.message}`);
+    }).finally(() => {
+      this.module.finishUnsplashRequest(this.config.unsplashAPIKey);
+    });
+  }
+}
+
 class ChromecastSource extends WallpaperSource {
   static matches(source) {
     return source === "chromecast";
@@ -700,7 +784,8 @@ const SOURCE_TYPES = [
   NasaSource,
   PexelsSource,
   RedditSource,
-  SynologyMomentsSource
+  SynologyMomentsSource,
+  UnsplashSource
 ];
 
 function createSource(module, config, id) {

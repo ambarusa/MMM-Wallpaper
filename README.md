@@ -47,12 +47,13 @@ The following properties can be configured:
 |---|---|---|
 |`source`|`"bing"`|The image source to use.  See table below for supported sources.|
 |`caption`|`true`|Whether to display the image caption/attribution when available.|
+|`captionPosition`|`{ bottom: "25px", right: "25px" }`|CSS offsets for the caption/attribution. Set `top`, `right`, `bottom`, and/or `left`; the default places it in the bottom-right corner.|
 |`fadeEdges`|`false`|Whether to fade the top and bottom 10% of the image.|
 |`updateInterval`|`60 * 60 * 1000`|How often (in ms) to check the source for new wallpapers.|
 |`slideInterval`|`5 * 60 * 1000`|How often (in ms) to change images.|
 |`maximumEntries`|`10`|The maximum number of images to load from the source.|
 |`filter`|`"grayscale(0.5) brightness(0.5)"`|The CSS filter to apply to the images, to improve readability of other modules' text|
-|`orientation`|`"auto"`|The image orientation to retrieve.  Choices are "vertical," "horizontal," and "auto."  Only used by the `pexels` and `bing` sources.|
+|`orientation`|`"auto"`|The image orientation to retrieve. Choices are "vertical," "horizontal," and "auto." Used by the `pexels`, `bing`, and `unsplash` sources (`vertical` and `horizontal` map to Unsplash's `portrait` and `landscape`).|
 |`crossfade`|`true`|Whether to crossfade between images when loading a new wallpaper, or just replace the current image.|
 |`maxWidth`|`MAX_SAFE_INTEGER`|Maximum width of selected variant (only supported for reddit & flickr sources).|
 |`maxHeight`|`MAX_SAFE_INTEGER`|Maximum height of selected variant (only supported for reddit & flickr sources).|
@@ -82,8 +83,23 @@ The following properties can be configured:
 |`"/user/<username>/m/<subreddit>"`|Cycles through the most recent `hot` image posts from the specified multireddit.|
 |`"metmuseum:<departmentID>,<isHighlight>,<q>"`|Cycle through collections in the Metropolitan Museum of Art. [departmentID](https://collectionapi.metmuseum.org/public/collection/v1/departments) is a number specifying collection type, e.g., Asian art, paintings etc. `<isHighlight>` is a `boolean` to show only highlighted artwork if set to `true`. `<q>` is keyword, e.g. artist name, culture, etc. All fields can be set to the wildcard `*`. For example, `"metmuseum:11,true,*"` would display highlighted European paintings.|
 |`"nasa:<search term>"`|Cycles through images specified in `search term` of NASA's Image and Video Library (https://api.nasa.gov/).|
+|`"unsplash"`|Cycles through random photos from Unsplash, optionally filtered by `unsplashQuery`, `unsplashCollectionIDs`, or `unsplashUserName`. Requires an Unsplash API key.|
 
 Source-specific configuration items:
+
+unsplash:
+
+|Option|Default|Description|
+|---|---|---|
+|`unsplashAPIKey`|`""`|Unsplash API access key. Required when `source` is `"unsplash"`.|
+|`unsplashQuery`|`""`|Search term used to select a random photo.|
+|`unsplashCollectionIDs`|`false`|Collection IDs used to restrict random photos; accepts an array or a comma-separated string.|
+|`unsplashUserName`|`false`|Restrict random photos to this Unsplash username. Takes precedence over `unsplashCollectionIDs`.|
+|`unsplashPhotoID`|`false`|Load this specific Unsplash photo instead of a random photo; overrides `unsplashQuery` and other filters.|
+
+Unsplash attribution is not required, but it is encouraged by Unsplash. If `caption` is enabled, the photographer credit is shown as the image caption and can be repositioned with `captionPosition`. Consider leaving it on.
+
+A demo-tier key allows 50 API requests per rolling hour; each random request can return up to 30 photos, so this source caps `maximumEntries` at 30. The helper pauses requests when 5 or fewer remain and limits its own requests to 45 per rolling hour. `slideInterval` keeps cycling loaded photos while requests are paused.
 
 flickr-api:
 
@@ -134,4 +150,5 @@ MMM-Wallpaper can react to the following notifications sent by other modules:
 |`LOAD_NEXT_WALLPAPER`|`none`|Will load the next wallpaper from the configured source.|
 |`LOAD_PREVIOUS_WALLPAPER`|`none`|Will load the previous wallpaper from the configured source.|
 |`UPDATE_WALLPAPER_CONFIG`|`string` or `object`|If the payload is a string, the module will use it as the new source to begin loading wallpapers.  If the payload is an object, the module will update its configuration with the object's properties.  In either case, a new wallpaper will immediately be loaded and the update timer will be reset.|
+|`UNSPLASH_QUERY`|`string`|When `source` is `"unsplash"`, replace `unsplashQuery` and immediately fetch a new photo. An empty string clears the query.|
 |`USER_PRESENCE`|`bool`|Will take the appropriate action to hide or show itself based on the value of the payload and the configured `userPresenceAction`.|

@@ -25,6 +25,12 @@ Module.register("MMM-Wallpaper", {
     flickrDataCacheTime: 24 * 60 * 60 * 1000,
     flickrResultsPerPage: 500, // Flickr API is limited to 500 photos per page
     fadeEdges: false,
+    captionPosition: { bottom: "25px", right: "25px" },
+    unsplashAPIKey: "",
+    unsplashQuery: "",
+    unsplashCollectionIDs: false,
+    unsplashUserName: false,
+    unsplashPhotoID: false,
   },
 
   getStyles: function() {
@@ -36,6 +42,7 @@ Module.register("MMM-Wallpaper", {
 
     self.loadNextImageTimer = null;
     self.imageIndex = -1;
+    self.forceImageRefresh = false;
 
     self.wrapper = document.createElement("div");
     self.wrapper.className = "MMM-Wallpaper";
@@ -46,6 +53,7 @@ Module.register("MMM-Wallpaper", {
     self.title = document.createElement("div");
     self.title.className = "title";
     self.content.appendChild(self.title);
+    self.setCaptionPosition();
 
     if (self.config.fadeEdges) {
       self.topGradient = document.createElement("div");
@@ -94,9 +102,19 @@ Module.register("MMM-Wallpaper", {
         Object.assign(self.config, payload);
       }
 
+      self.setCaptionPosition();
       clearInterval(self.updateTimer);
       self.getData();
       self.updateTimer = setInterval(() => self.getData(), self.config.updateInterval);
+    } else if (notification === "UNSPLASH_QUERY" && self.config.source === "unsplash") {
+      if (typeof payload !== "string") {
+        console.error("MMM-Wallpaper: UNSPLASH_QUERY payload must be a string");
+        return;
+      }
+
+      self.config.unsplashQuery = payload;
+      self.forceImageRefresh = true;
+      self.getData();
     }
   },
 
@@ -104,14 +122,19 @@ Module.register("MMM-Wallpaper", {
     var self = this;
 
     if (notification === "WALLPAPERS") {
+      var isCurrentUnsplashQuery = payload.source !== "unsplash" || payload.unsplashQuery === self.config.unsplashQuery;
       if (payload.orientation === self.getOrientation() &&
+          isCurrentUnsplashQuery &&
           ((Array.isArray(self.config.source) && self.config.source.includes(payload.source)) ||
            (!Array.isArray(self.config.source) && self.config.source === payload.source)))
       {
         self.images = payload.images.slice(0, self.config.maximumEntries);
         self.imageIndex = self.imageIndex % (self.images.length || 1);
 
-        if (self.imageElement === null && self.images.length > 0) {
+        if (self.forceImageRefresh && self.images.length > 0) {
+          self.forceImageRefresh = false;
+          self.loadNextImage();
+        } else if (self.imageElement === null && self.images.length > 0) {
           self.loadNextImage();
         }
       }
@@ -178,6 +201,21 @@ Module.register("MMM-Wallpaper", {
 
   getDom: function() {
     return this.wrapper;
+  },
+
+  setCaptionPosition: function() {
+    var position = this.config.captionPosition || { bottom: "25px", right: "25px" };
+    var sides = ["top", "right", "bottom", "left"];
+
+    for (var i = 0; i < sides.length; i++) {
+      var side = sides[i];
+      var value = Object.prototype.hasOwnProperty.call(position, side) ? position[side] : "auto";
+
+      if (typeof value === "number") {
+        value += "px";
+      }
+      this.title.style[side] = typeof value === "string" ? value : "auto";
+    }
   },
 
   getViewport: function() {
